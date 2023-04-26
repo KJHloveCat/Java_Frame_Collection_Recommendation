@@ -21,14 +21,15 @@ class CompLastNum implements Comparator<String> {
     }
 }
 
+
 public class HW1 {
     public static void main(String[] args) throws IOException {
         Scanner sc = new Scanner(System.in);
         System.out.printf("파일 이름, target 사용자, 참고인 수, 항목 수? ");
         String file = sc.next();
         int target = sc.nextInt();
-        int compare = sc.nextInt();
-        int item = sc.nextInt();
+        int n = sc.nextInt();
+        int k = sc.nextInt();
 
         BufferedReader reader = new BufferedReader(new FileReader(file));
         HashMap<Integer, HashMap<String, Double>> doubleHash = new HashMap<Integer, HashMap<String, Double>>();
@@ -52,27 +53,27 @@ public class HW1 {
         for( int i : doubleHash.keySet()) {
             map = doubleHash.get(i);
             double sum = 0;
-            int n = 0;
+            num = 0;
             for (double j : map.values()){
                 sum += j;
-                n++;
+                num++;
             }
-            double avg = sum / n ;
+            double avg = sum / num ;
 
             for (String contents : map.keySet()){
                 map.put(contents ,map.get(contents) - avg);
             }
-        } // 정규화 완료
+        }
 
         int size = doubleHash.get(target).keySet().size();
-        int n = 0;
+        num = 0;
         System.out.println();
         System.out.printf("1. 사용자 %d의 콘텐츠와 정규화 점수 : \n[",target);
         ArrayList<String> content = new ArrayList<String>(doubleHash.get(target).keySet());
 
         for(String s : sort_content(content)){
-            n++;
-            if (n == size) {
+            num++;
+            if (num == size) {
                 System.out.printf("(%s, %.3f)]\n\n",s, Math.round(1000*doubleHash.get(target).get(s))/ 1000.0);
                 break;
             }
@@ -84,13 +85,13 @@ public class HW1 {
 
         HashMap<Integer, Double> similarity = new HashMap<Integer, Double>();
 
-        int max = 0;
         for (int i : doubleHash.keySet()){
 
             similarity.put(i, cosine_similarity(doubleHash.get(target), doubleHash.get(i)));
 
         }
 
+        similarity.remove(target);
         ArrayList<Integer> sim_keySet = new ArrayList<Integer>(similarity.keySet());
         sim_keySet.remove(target);
         sim_keySet.sort(new Comparator<Integer>() {
@@ -102,7 +103,7 @@ public class HW1 {
 
         int sim_num = 0;
         for (Integer key : sim_keySet) {
-            if(sim_num == compare){
+            if(sim_num == n){
                 break;
             }
             System.out.print("사용자 id : " + key);
@@ -111,28 +112,48 @@ public class HW1 {
         }
 
         System.out.println();
-        System.out.printf("3. 사용자 %d에게 추천할 콘텐츠와 추천 점수\n",target);
+        System.out.printf("3. 사용자 %d에게 추천할 콘텐츠와 추천 점수\n[",target);
 
         HashSet<String> targetContent = new HashSet<String>(doubleHash.get(target).keySet());
-        HashSet<String> compContent = new HashSet<String>();
+        HashMap<String, Double> compContent = new HashMap<String, Double>();
+
+        sim_num = 0;
         for(Integer key : sim_keySet) {
-            HashSet<String> compTemp = new HashSet<String>(doubleHash.get(key).keySet());
-            compTemp.removeAll(targetContent);
-            compContent.addAll(compTemp);
-        }
-
-        System.out.println(targetContent+"\n"+compContent);
-
-        for(Integer key : sim_keySet) {
-            if(){
-
+            if(sim_num == n){
+                break;
             }
-            doubleHash.get(key).keySet()
+            HashSet<String> compTemp = new HashSet<String>(doubleHash.get(key).keySet());
+
+            compTemp.removeAll(targetContent);
+
+            for(String itr: compTemp){
+                double score = doubleHash.get(key).get(itr) * similarity.get(key);
+
+                if(compContent.containsKey(itr)){
+
+                    if(compContent.get(itr) < score ) {
+                        compContent.put(itr, compContent.get(itr)+score);
+                    }
+                }else {
+                    compContent.put(itr, score);
+                }
+            }
+            sim_num ++;
         }
 
+        num = 0;
+        for(String s : sort_score(compContent)){
+            num++;
+            if (num == k) {
+                System.out.printf("(%s, %.3f)]\n\n",s, Math.round(1000*compContent.get(s))/ 1000.0);
+                break;
+            }
+            System.out.printf("(%s, %.3f), ",s, Math.round(1000*compContent.get(s))/ 1000.0);
+
+        }
         long after_time = System.currentTimeMillis();
-        long secDifference = (after_time-before_time)/1000;
-        System.out.println("시간차이:"+secDifference);
+        long secDifference = (after_time-before_time);
+        System.out.printf("걸린시간(ms): "+secDifference);
 
     }
     static double cosine_similarity(HashMap<String, Double> user1, HashMap<String, Double> user2){
@@ -170,6 +191,34 @@ public class HW1 {
         Comparator<String> compLastThenFirst = compFN.thenComparing(new CompLastNum());
 
         sort_str.sort(compLastThenFirst);
+        return sort_str;
+    }
+
+    static ArrayList<String> sort_score (HashMap<String, Double> contentScore) {
+        ArrayList<String> sort_str = new ArrayList<String>();
+        for(String s : contentScore.keySet()){
+            sort_str.add(s);
+        }
+
+        Comparator<String> compFS = new Comparator<String>() {
+            @Override
+            public int compare(String o1, String o2) {
+
+                double s1 = (Math.round(1000*contentScore.get(o2))/ 1000.0);
+                double s2 = (Math.round(1000*contentScore.get(o1))/ 1000.0);
+
+                if (s1 == s2) {
+                    return 0;
+                } else {
+                    return contentScore.get(o2).compareTo(contentScore.get(o1));
+                }
+            }
+        };
+        CompFirstName compFN = new CompFirstName();
+        Comparator<String> compLastThenFirst = compFN.thenComparing(new CompLastNum());
+        Comparator<String> compScoreThenOther = compFS.thenComparing(compLastThenFirst);
+
+        sort_str.sort(compScoreThenOther);
         return sort_str;
     }
 }
